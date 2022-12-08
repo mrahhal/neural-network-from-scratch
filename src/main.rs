@@ -1,12 +1,10 @@
 mod datasets;
 
+use datasets::mnist::Data;
+
 fn main() {
-    let train_data = datasets::mnist::parse(
-        "datasets/mnist/train-images.idx3-ubyte",
-        "datasets/mnist/train-labels.idx1-ubyte",
-    );
-    let test_data = datasets::mnist::parse(
-        "datasets/mnist/t10k-images.idx3-ubyte",
-        "datasets/mnist/t10k-labels.idx1-ubyte",
-    );
+    let Data { train, test } = datasets::mnist::load_and_parse_data();
+
+    println!("Number of train data: {}", train.len());
+    println!("Number of test data: {}", test.len());
 }

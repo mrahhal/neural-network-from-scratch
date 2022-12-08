@@ -5,14 +5,33 @@ use nalgebra::{ArrayStorage, Matrix, U28};
 
 pub type ImageData = Matrix<u8, U28, U28, ArrayStorage<u8, 28, 28>>;
 
+pub struct Data {
+    pub train: Vec<Image>,
+    pub test: Vec<Image>,
+}
+
 #[derive(Clone, Debug)]
 pub struct Image {
     pub label: u8,
     pub data: ImageData,
 }
 
+/// Loads and parses data from the mnist dataset files.
+pub fn load_and_parse_data() -> Data {
+    let train = parse_from_files(
+        "datasets/mnist/train-images.idx3-ubyte",
+        "datasets/mnist/train-labels.idx1-ubyte",
+    );
+    let test = parse_from_files(
+        "datasets/mnist/t10k-images.idx3-ubyte",
+        "datasets/mnist/t10k-labels.idx1-ubyte",
+    );
+
+    Data { train, test }
+}
+
 /// Parses mnist dataset files into images with their labels.
-pub fn parse(images_path: &str, labels_path: &str) -> Vec<Image> {
+fn parse_from_files(images_path: &str, labels_path: &str) -> Vec<Image> {
     let images_bytes = read(images_path).unwrap();
     let labels_bytes = read(labels_path).unwrap();
 

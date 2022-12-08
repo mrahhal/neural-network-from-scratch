@@ -5,4 +5,4 @@
 
 ## Setup
 
-Dataset used is [mnist](http://yann.lecun.com/exdb/mnist/). Download the 4 archives and extract them to a folder called "dataset" in the root of this repository.
+Dataset used is [mnist](http://yann.lecun.com/exdb/mnist/). Download the 4 archives and extract them into "datasets/mnist" in the root of this repository.

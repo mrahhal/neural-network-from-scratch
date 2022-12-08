@@ -1,6 +1,6 @@
 {
   "files.exclude": {
     "target": true,
-    "dataset": true
+    "datasets": true
   }
 }

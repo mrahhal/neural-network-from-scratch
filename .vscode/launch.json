@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'neural-network-from-scratch'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=neural-network-from-scratch",
+          "--package=neural-network-from-scratch"
+        ],
+        "filter": {
+          "name": "neural-network-from-scratch",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'neural-network-from-scratch'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=neural-network-from-scratch",
+          "--package=neural-network-from-scratch"
+        ],
+        "filter": {
+          "name": "neural-network-from-scratch",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

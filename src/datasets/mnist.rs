@@ -16,6 +16,28 @@ pub struct Image {
     pub data: ImageData,
 }
 
+impl Image {
+    pub fn to_vec(&self) -> Vec<f64> {
+        let mut v = Vec::with_capacity(28 * 28);
+        self.fill_vec(&mut v);
+        v
+    }
+
+    /// Fill image data into the vec.
+    pub fn fill_vec(&self, v: &mut Vec<f64>) {
+        v.clear();
+        for x in self.data.iter() {
+            v.push((*x).into());
+        }
+    }
+
+    pub fn to_label_distribution(&self) -> Vec<f64> {
+        (0..10)
+            .map(|i| if i == self.label { 1f64 } else { 0f64 })
+            .collect()
+    }
+}
+
 /// Loads and parses data from the mnist dataset files.
 pub fn load_and_parse_data() -> Data {
     let train = parse_from_files(
@@ -56,7 +78,7 @@ fn parse_from_files(images_path: &str, labels_path: &str) -> Vec<Image> {
         for row in 0..number_of_rows {
             for col in 0..number_of_cols {
                 let pixel = images_bytes[images_bytes_offset];
-                image.data[(row, col)] = pixel;
+                image.data[(row, col)] = pixel.into();
                 images_bytes_offset += 1;
             }
         }

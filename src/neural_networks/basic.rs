@@ -1,5 +1,6 @@
 use std::{
     cell::{Cell, RefCell},
+    f64::EPSILON,
     sync::Mutex,
 };
 
@@ -8,7 +9,7 @@ use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
 use rand_distr::StandardNormal;
 
-use crate::utils::{small_value, softmax, Matrix, Vector};
+use crate::utils::{softmax, Matrix, Vector};
 
 /// A basic deep neural network.
 ///
@@ -437,7 +438,7 @@ impl Loss for CCELoss {
 
         let predicted: Vec<_> = predicted
             .iter()
-            .map(|v| v.clamp(small_value(), 1.0 - small_value()))
+            .map(|v| v.clamp(EPSILON, 1.0 - EPSILON))
             .collect();
 
         let mut sum = 0f64;

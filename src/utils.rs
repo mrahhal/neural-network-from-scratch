@@ -35,7 +35,3 @@ pub fn softmax(vec: &Vector) -> Vector {
 
     Vector::from_vec(result)
 }
-
-pub fn small_value() -> f64 {
-    E.powf(-7.0)
-}

@@ -45,7 +45,7 @@ fn main() {
     let mut rng = StdRng::seed_from_u64(42);
     train.shuffle(&mut rng);
     // let validate: Vec<Image> = train.drain(50_000..).collect();
-    let train: Vec<Image> = train.drain(..10_000).collect();
+    let train: Vec<Image> = train.drain(..2_000).collect();
     let test: Vec<Image> = test.drain(..1_000).collect();
 
     println!("BEFORE TRAINING");
@@ -59,7 +59,7 @@ fn main() {
     // Training
     // ---
 
-    let target_accuracy = 0.96;
+    let target_accuracy = 0.95;
 
     println!("===");
     println!(

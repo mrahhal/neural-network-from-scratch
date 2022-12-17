@@ -1,6 +1,9 @@
-use std::f64::consts::E;
+use std::{f64::consts::E, sync::Mutex};
 
 use nalgebra::{DMatrix, DVector};
+use once_cell::sync::Lazy;
+use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
+use rand_distr::StandardNormal;
 
 pub type Vector = DVector<f64>;
 
@@ -34,4 +37,18 @@ pub fn softmax(vec: &Vector) -> Vector {
     }
 
     Vector::from_vec(result)
+}
+
+static RNG: Lazy<Mutex<StdRng>> = Lazy::new(|| Mutex::new(StdRng::seed_from_u64(42)));
+
+pub fn rnd_normal() -> f64 {
+    // thread_rng().sample(StandardNormal)
+
+    let mut rng = RNG.lock().unwrap();
+    rng.sample(StandardNormal)
+}
+
+pub fn shuffle_vec<T>(vec: &mut Vec<T>) {
+    let mut rng = RNG.lock().unwrap();
+    vec.shuffle(&mut *rng)
 }

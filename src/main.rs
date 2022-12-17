@@ -4,16 +4,15 @@ mod utils;
 
 use std::time::Instant;
 
-use rand::rngs::StdRng;
-use rand::seq::SliceRandom;
-use rand::SeedableRng;
-
 use crate::datasets::mnist::{Data, Image};
 use crate::neural_networks::basic::{self as nn, CCELoss, Loss};
-use crate::utils::{argmax, Vector};
+use crate::utils::{argmax, shuffle_vec};
 
 fn main() {
-    let Data { mut train, mut test } = datasets::mnist::load_and_parse_data();
+    let Data {
+        mut train,
+        mut test,
+    } = datasets::mnist::load_and_parse_data();
 
     let mut network = nn::Network::<{ 28 * 28 }, 10>::new();
 
@@ -42,8 +41,7 @@ fn main() {
     //     loss,
     // );
 
-    let mut rng = StdRng::seed_from_u64(42);
-    train.shuffle(&mut rng);
+    shuffle_vec(&mut train);
     // let validate: Vec<Image> = train.drain(50_000..).collect();
     let train: Vec<Image> = train.drain(..2_000).collect();
     let test: Vec<Image> = test.drain(..1_000).collect();

@@ -1,21 +1,19 @@
 use std::{
     cell::{Cell, RefCell},
     f64::EPSILON,
-    sync::Mutex,
 };
 
 use nalgebra::{Dynamic, MatrixSlice, U1};
-use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
-use rand_distr::StandardNormal;
 
-use crate::utils::{softmax, Matrix, Vector};
+use crate::utils::{rnd_normal, softmax, Matrix, Vector};
 
 /// A basic deep neural network.
 ///
 /// I: The number of neurons in the input layer.
 /// O: The number of neurons in the output layer.
 pub struct Network<const I: usize, const O: usize> {
+    learning_rate: f64,
+
     /// All layers after the input layer (i.e hidden layers + output layer).
     layers: Vec<Layer>,
 }
@@ -38,13 +36,6 @@ fn create_layer(
     Layer::new(neurons)
 }
 
-// TODO: To be configurable.
-// const HIDDEN_LAYERS_COUNT: usize = 2;
-// const HIDDEN_NEURONS_COUNT: usize = 16;
-const LEARNING_RATE: f64 = 0.01;
-
-static RNG: Lazy<Mutex<StdRng>> = Lazy::new(|| Mutex::new(StdRng::seed_from_u64(42)));
-
 impl<const I: usize, const O: usize> Network<I, O> {
     pub fn new() -> Self {
         let hidden_layers = [200, 80];
@@ -65,7 +56,15 @@ impl<const I: usize, const O: usize> Network<I, O> {
             Box::new(NoopActivator)
         }));
 
-        Self { layers }
+        Self {
+            learning_rate: 0.01,
+            layers,
+        }
+    }
+
+    pub fn learning_rate(&mut self, learning_rate: f64) -> &mut Self {
+        self.learning_rate = learning_rate;
+        self
     }
 
     /// Run through the network and produce an output.
@@ -125,14 +124,14 @@ impl<const I: usize, const O: usize> Network<I, O> {
             for v in w.iter_mut() {
                 // combining mean and step computation
                 *v /= samples_count;
-                *v *= -LEARNING_RATE;
+                *v *= -self.learning_rate;
             }
         }
         for b in &mut total_gradients.biases {
             for v in b.iter_mut() {
                 // combining mean and step computation
                 *v /= samples_count;
-                *v *= -LEARNING_RATE;
+                *v *= -self.learning_rate;
             }
         }
 
@@ -310,8 +309,7 @@ impl Neuron {
 
     /// Does a forward step.
     ///
-    /// z: Σw.a + b
-    /// a: σ(z)
+    /// z = Σw.a + b
     fn forward(&self, prev_activs: &Vector) -> f64 {
         debug_assert!(self.params.weights.len() == prev_activs.len());
 
@@ -333,7 +331,7 @@ impl Neuron {
         let z = self.z.get();
 
         // da/dz
-        let d_a_z = self.activator.derivative_multiplier(z);
+        let d_a_z = self.activator.derivative(z);
 
         // dL/dz
         // next_values are `g_z.W` from the next layer.
@@ -367,7 +365,7 @@ struct NeuronGradient {
 trait Activator {
     fn activate(&self, z: f64) -> f64;
 
-    fn derivative_multiplier(&self, z: f64) -> f64;
+    fn derivative(&self, z: f64) -> f64;
 }
 
 /// Rectified linear unit ([ReLU]) activation.
@@ -376,29 +374,56 @@ trait Activator {
 struct ReLUActivator;
 
 impl Activator for ReLUActivator {
+    /// a(z) =
+    ///     0 if z <= 0
+    ///     z if z > 0
     fn activate(&self, z: f64) -> f64 {
-        z.max(0f64)
+        z.max(0.0)
     }
 
-    fn derivative_multiplier(&self, z: f64) -> f64 {
+    /// a' =
+    ///     0 if z <= 0
+    ///     1 if z > 0
+    fn derivative(&self, z: f64) -> f64 {
         if z > 0.0 {
-            1f64
+            1.0
         } else {
-            0f64
+            0.0
         }
     }
 }
 
-/// A noop activator, used in the output layer, as activation/derivation there is done in a separate place.
+/// [Sigmoid] activation.
+/// Not supported yet, because an optimization that combines the deriv of CCE and ReLU is hard
+/// coded right now for optimization.
+///
+/// [Sigmoid]: https://en.wikipedia.org/wiki/Sigmoid_function
+struct SigmoidActivator;
+
+impl Activator for SigmoidActivator {
+    /// a(z) = 1 / 1 + e^-z
+    fn activate(&self, z: f64) -> f64 {
+        1.0 / (1.0 + -z.exp())
+    }
+
+    /// a' = a . (1 - a)
+    fn derivative(&self, z: f64) -> f64 {
+        let a = self.activate(z);
+        a * (1.0 - a)
+    }
+}
+
+/// A noop activator, used in the output layer sometimes when the activation/derivation is done
+/// in a separate process (i.e combining activation + loss as an optimization).
 struct NoopActivator;
 
 impl Activator for NoopActivator {
-    fn activate(&self, x: f64) -> f64 {
-        x
+    fn activate(&self, z: f64) -> f64 {
+        z
     }
 
-    fn derivative_multiplier(&self, x: f64) -> f64 {
-        1f64
+    fn derivative(&self, _: f64) -> f64 {
+        1.0
     }
 }
 
@@ -423,11 +448,11 @@ pub trait Loss {
 ///
 /// ye: expected
 /// yp: predicted
-/// L: -Σye.ln(yp)
+/// L = -Σye.ln(yp)
 ///
 /// Could have been simplified to the following if instead of expected vec, we get the index of
 /// the class that should be 1, because we know other classes will be 0.
-/// L: -ln(yp)
+/// L = -ln(yp)
 pub struct CCELoss;
 
 impl Loss for CCELoss {
@@ -441,12 +466,12 @@ impl Loss for CCELoss {
             .map(|v| v.clamp(EPSILON, 1.0 - EPSILON))
             .collect();
 
-        let mut sum = 0f64;
+        let mut sum = 0.0;
         for i in 0..expected.len() {
             sum += expected[i] * predicted[i].ln();
         }
 
-        -1f64 * sum
+        -sum
     }
 }
 
@@ -461,9 +486,7 @@ fn generate_random_weights(count: usize) -> Vector {
     let mut weights = Vec::with_capacity(count);
 
     for _ in 0..count {
-        let mut l = RNG.lock().unwrap();
-        let r: f64 = l.sample(StandardNormal);
-        // let r: f64 = thread_rng().sample(StandardNormal);
+        let r = rnd_normal();
         weights.push(r * 0.01);
     }
 

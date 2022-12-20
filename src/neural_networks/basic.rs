@@ -12,7 +12,7 @@ use crate::utils::{rnd_normal, softmax, Matrix, Vector};
 /// I: The number of neurons in the input layer.
 /// O: The number of neurons in the output layer.
 pub struct Network<const I: usize, const O: usize> {
-    learning_rate: f64,
+    optimizer: Box<dyn Optimizer>,
 
     /// All layers after the input layer (i.e hidden layers + output layer).
     layers: Vec<Layer>,
@@ -57,14 +57,9 @@ impl<const I: usize, const O: usize> Network<I, O> {
         }));
 
         Self {
-            learning_rate: 0.01,
+            optimizer: Box::new(ConstantRateOptimizer::new(0.01)),
             layers,
         }
-    }
-
-    pub fn learning_rate(&mut self, learning_rate: f64) -> &mut Self {
-        self.learning_rate = learning_rate;
-        self
     }
 
     /// Run through the network and produce an output.
@@ -85,72 +80,24 @@ impl<const I: usize, const O: usize> Network<I, O> {
     }
 
     pub fn train(&mut self, samples: &Vec<(Vec<f64>, Vec<f64>)>) {
-        let mut total_gradients: Option<SinglePassGradients> = None;
-        let samples_count = samples.len() as f64;
-
         for (input, expected) in samples {
-            let gradients = self.backward(input, expected);
-            // TODO: refactor
-            if total_gradients.is_none() {
-                total_gradients.replace(gradients);
-            } else {
-                let total_gradients = total_gradients.as_mut().unwrap();
-                for i in 0..gradients.weights.len() {
-                    let w = &gradients.weights[i];
-                    let w_t = &mut total_gradients.weights[i];
-
-                    // TODO: optimize
-                    for (rowi, row) in w.row_iter().enumerate() {
-                        for (coli, v) in row.iter().enumerate() {
-                            w_t[(rowi, coli)] += v;
-                        }
-                    }
-                    // w.add_to(w_t, w_t);
-
-                    let b = &gradients.biases[i];
-                    let b_t = &mut total_gradients.biases[i];
-                    for (i, v) in b.iter().enumerate() {
-                        b_t[i] += v;
-                    }
-                    // b.add_to(b_t, b_t);
-                }
-            }
+            self.backward(input, expected);
         }
 
-        // Produce gradient mean.
-
-        let mut total_gradients = total_gradients.unwrap();
-        for w in &mut total_gradients.weights {
-            for v in w.iter_mut() {
-                // combining mean and step computation
-                *v /= samples_count;
-                *v *= -self.learning_rate;
-            }
-        }
-        for b in &mut total_gradients.biases {
-            for v in b.iter_mut() {
-                // combining mean and step computation
-                *v /= samples_count;
-                *v *= -self.learning_rate;
-            }
+        for layer in &mut self.layers {
+            // Produce gradient mean.
+            layer.gradients.as_mut().unwrap().mean(samples.len());
         }
 
-        // Perform a gradient descent step.
-        let descent = total_gradients;
-
-        for (i, layer) in &mut self.layers.iter_mut().enumerate() {
-            let layer_descent_w = &descent.weights[i];
-            let layer_descent_b = &descent.biases[i];
-
-            for (ni, n) in &mut layer.neurons.iter_mut().enumerate() {
-                let n_descent_w = layer_descent_w.column(ni);
-                n.params.weights += n_descent_w;
-                n.params.bias += layer_descent_b[ni];
-            }
+        // Run the optimizer to do a gradient descent step.
+        self.optimizer.enter();
+        for layer in &mut self.layers.iter_mut() {
+            self.optimizer.update(layer);
         }
+        self.optimizer.exit();
     }
 
-    fn backward(&mut self, input: &[f64], expected: &[f64]) -> SinglePassGradients {
+    fn backward(&mut self, input: &[f64], expected: &[f64]) {
         // output is softmaxed
         let output = self.run(&input);
 
@@ -170,30 +117,27 @@ impl<const I: usize, const O: usize> Network<I, O> {
             prev_values = layer.backward(&prev_values);
         }
 
-        // Collect gradients.
-        let mut g_weights = vec![];
-        let mut g_biases = vec![];
-
-        for layer in &self.layers {
+        for layer in &mut self.layers {
             let prev_layer_neuron_count = layer.neurons[0].params.weights.len();
             let curr_layer_neuron_count = layer.neurons.len();
 
-            let mut g_layer_weights =
-                Matrix::zeros(prev_layer_neuron_count, curr_layer_neuron_count);
-            let mut g_layer_biases = Vec::with_capacity(curr_layer_neuron_count);
+            let mut weights = Matrix::zeros(prev_layer_neuron_count, curr_layer_neuron_count);
+            let mut biases = Vec::with_capacity(curr_layer_neuron_count);
 
             for (i, n) in layer.neurons.iter().enumerate() {
-                g_layer_weights.set_column(i, &n.gradient.as_ref().unwrap().weights);
-                g_layer_biases.push(n.gradient.as_ref().unwrap().bias);
+                weights.set_column(i, &n.gradient.as_ref().unwrap().weights);
+                biases.push(n.gradient.as_ref().unwrap().bias);
             }
 
-            g_weights.push(g_layer_weights);
-            g_biases.push(Vector::from_vec(g_layer_biases));
-        }
-
-        SinglePassGradients {
-            weights: g_weights,
-            biases: g_biases,
+            let layer_gradients = LayerGradients {
+                weights,
+                biases: Vector::from_vec(biases),
+            };
+            if layer.gradients.is_none() {
+                layer.gradients.replace(layer_gradients);
+            } else {
+                layer.gradients.as_mut().unwrap().add(&layer_gradients);
+            }
         }
     }
 
@@ -226,9 +170,21 @@ impl<const I: usize, const O: usize> Network<I, O> {
     }
 }
 
-struct SinglePassGradients {
-    weights: Vec<Matrix>,
-    biases: Vec<Vector>,
+struct LayerGradients {
+    weights: Matrix,
+    biases: Vector,
+}
+
+impl LayerGradients {
+    fn add(&mut self, other: &LayerGradients) {
+        self.weights += &other.weights;
+        self.biases += &other.biases;
+    }
+
+    fn mean(&mut self, samples_count: usize) {
+        self.weights /= samples_count as f64;
+        self.biases /= samples_count as f64;
+    }
 }
 
 /// Represents a layer in a network.
@@ -241,6 +197,8 @@ struct Layer {
     /// The current run's activations of the preceding layer.
     /// Used when backpropagating.
     prev_activs: RefCell<Option<Vector>>,
+
+    gradients: Option<LayerGradients>,
 }
 
 impl Layer {
@@ -248,6 +206,7 @@ impl Layer {
         Layer {
             neurons,
             prev_activs: Default::default(),
+            gradients: None,
         }
     }
 
@@ -473,6 +432,46 @@ impl Loss for CCELoss {
 
         -sum
     }
+}
+
+trait Optimizer {
+    fn enter(&mut self);
+
+    fn update(&mut self, layer: &mut Layer);
+
+    fn exit(&mut self);
+
+    fn update_for_descent(&mut self, layer: &mut Layer, d_weights: Matrix, d_biases: Vector) {
+        for (ni, n) in &mut layer.neurons.iter_mut().enumerate() {
+            n.params.weights += d_weights.column(ni);
+            n.params.bias += d_biases[ni];
+        }
+    }
+}
+
+struct ConstantRateOptimizer {
+    learning_rate: f64,
+}
+
+impl ConstantRateOptimizer {
+    fn new(learning_rate: f64) -> Self {
+        Self { learning_rate }
+    }
+}
+
+impl Optimizer for ConstantRateOptimizer {
+    fn enter(&mut self) {}
+
+    fn update(&mut self, layer: &mut Layer) {
+        let g = layer.gradients.as_mut().unwrap();
+
+        let d_weights = &g.weights * -self.learning_rate;
+        let d_biases = &g.biases * -self.learning_rate;
+
+        self.update_for_descent(layer, d_weights, d_biases);
+    }
+
+    fn exit(&mut self) {}
 }
 
 fn generate_random_neuron_params(count: usize) -> NeuronParams {

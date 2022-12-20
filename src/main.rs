@@ -74,7 +74,7 @@ fn main() {
         .collect();
     loop {
         println!("-------------------");
-        print!("Epoch #{}: training {} samples...", epochs, dataset.len(),);
+        print!("Epoch #{}: training on {} samples...", epochs, dataset.len(),);
         let instant = Instant::now();
 
         for chunk in train.chunks(100) {

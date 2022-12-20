@@ -434,13 +434,19 @@ impl Loss for CCELoss {
     }
 }
 
+/// Represents an optimizer that updates params (weights and biases) of layers accroding to
+/// a certain algorithm working on the calculated gradients.
 trait Optimizer {
+    /// Called once for each chunk of training samples before calling updates on layers.
     fn enter(&mut self);
 
+    /// Called for each layer to update the params.
     fn update(&mut self, layer: &mut Layer);
 
+    /// Called once for each chunk of training samples after calling updates on layers.
     fn exit(&mut self);
 
+    /// Don't override! Applies the calculated descent on the layer's params.
     fn update_for_descent(&mut self, layer: &mut Layer, d_weights: Matrix, d_biases: Vector) {
         for (ni, n) in &mut layer.neurons.iter_mut().enumerate() {
             n.params.weights += d_weights.column(ni);
@@ -449,6 +455,7 @@ trait Optimizer {
     }
 }
 
+/// An optimizer that applies a constant unchanging learning rate to update params.
 struct ConstantRateOptimizer {
     learning_rate: f64,
 }

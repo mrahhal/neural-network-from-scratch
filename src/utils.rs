@@ -9,6 +9,72 @@ pub type Vector = DVector<f64>;
 
 pub type Matrix = DMatrix<f64>;
 
+pub trait Arith<T> {
+    #[must_use]
+    fn sqrt(&self) -> T;
+
+    #[must_use]
+    fn pow2(&self, exp: i32) -> T;
+
+    #[must_use]
+    fn div2(&self, rhs: &T) -> T;
+}
+
+impl Arith<Matrix> for Matrix {
+    fn sqrt(&self) -> Matrix {
+        let mut r = Matrix::zeros(self.nrows(), self.ncols());
+        for (i, v) in self.iter().enumerate() {
+            r[i] = v.sqrt();
+        }
+        r
+    }
+
+    fn pow2(&self, exp: i32) -> Matrix {
+        // gemm: dimensions mismatch for multiplication.
+        // self.pow(exp as u32)
+
+        let mut r = Matrix::zeros(self.nrows(), self.ncols());
+        for (i, v) in self.iter().enumerate() {
+            r[i] = v.powi(exp);
+        }
+        r
+    }
+
+    fn div2(&self, rhs: &Matrix) -> Matrix {
+        let mut r = Matrix::zeros(self.nrows(), self.ncols());
+        for (i, v) in self.iter().enumerate() {
+            r[i] = v / rhs[i];
+        }
+        r
+    }
+}
+
+impl Arith<Vector> for Vector {
+    fn sqrt(&self) -> Vector {
+        let mut r = Vector::zeros(self.nrows());
+        for (i, v) in self.iter().enumerate() {
+            r[i] = v.sqrt();
+        }
+        r
+    }
+
+    fn pow2(&self, exp: i32) -> Vector {
+        let mut r = Vector::zeros(self.nrows());
+        for (i, v) in self.iter().enumerate() {
+            r[i] = v.powi(exp);
+        }
+        r
+    }
+
+    fn div2(&self, rhs: &Vector) -> Vector {
+        let mut r = Vector::zeros(self.nrows());
+        for (i, v) in self.iter().enumerate() {
+            r[i] = v / rhs[i];
+        }
+        r
+    }
+}
+
 /// Returns index of maximum item in vector.
 pub fn argmax(vec: &[f64]) -> usize {
     let mut max_index = 0;

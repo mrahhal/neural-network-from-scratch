@@ -43,7 +43,7 @@ fn main() {
 
     shuffle_vec(&mut train);
     // let validate: Vec<Image> = train.drain(50_000..).collect();
-    let train: Vec<Image> = train.drain(..2_000).collect();
+    let train: Vec<Image> = train.drain(..5_000).collect();
     let test: Vec<Image> = test.drain(..1_000).collect();
 
     println!("BEFORE TRAINING");
@@ -107,7 +107,6 @@ fn test_on<const I: usize, const O: usize>(
     samples: &[Image],
     prev_values: &Option<(f64, f64)>,
 ) -> (f64, f64) {
-    // println!("Testing a batch of samples...");
     let total = samples.len() as f64;
     let mut success = 0;
     let mut total_loss = 0f64;
@@ -125,7 +124,6 @@ fn test_on<const I: usize, const O: usize>(
         total_loss += loss;
     }
     let accuracy: f64 = success as f64 / total;
-    // accuracy = accuracy.round()
     let mean_loss: f64 = total_loss / total;
 
     let prev_accuracy = prev_values.map_or(None, |t| Some(t.0));
@@ -154,6 +152,7 @@ fn test_on<const I: usize, const O: usize>(
             loss_diff
         );
     }
+    println!("LR: {}", network.get_learning_rate());
 
     (accuracy, mean_loss)
 }

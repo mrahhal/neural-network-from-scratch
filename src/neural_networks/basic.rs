@@ -1,11 +1,13 @@
 use std::{
     cell::{Cell, RefCell},
+    collections::HashMap,
     f64::EPSILON,
+    hash::Hash,
 };
 
 use nalgebra::{Dynamic, MatrixSlice, U1};
 
-use crate::utils::{rnd_normal, softmax, Matrix, Vector};
+use crate::utils::{rnd_normal, softmax, Arith, Matrix, Vector};
 
 /// A basic deep neural network.
 ///
@@ -19,6 +21,7 @@ pub struct Network<const I: usize, const O: usize> {
 }
 
 fn create_layer(
+    index: usize,
     prev_neurons_count: usize,
     neurons_count: usize,
     activator_creator: impl Fn() -> Box<dyn Activator>,
@@ -33,7 +36,7 @@ fn create_layer(
         neurons.push(neuron);
     }
 
-    Layer::new(neurons)
+    Layer::new(index, neurons)
 }
 
 impl<const I: usize, const O: usize> Network<I, O> {
@@ -46,18 +49,21 @@ impl<const I: usize, const O: usize> Network<I, O> {
         let mut prev_neurons_count = I;
         for i in 0..hidden_layers_count {
             let neurons_count = hidden_layers[i];
-            layers.push(create_layer(prev_neurons_count, neurons_count, || {
+            layers.push(create_layer(i, prev_neurons_count, neurons_count, || {
                 Box::new(ReLUActivator)
             }));
             prev_neurons_count = neurons_count;
         }
 
-        layers.push(create_layer(prev_neurons_count, O, || {
-            Box::new(NoopActivator)
-        }));
+        layers.push(create_layer(
+            hidden_layers_count,
+            prev_neurons_count,
+            O,
+            || Box::new(NoopActivator),
+        ));
 
         Self {
-            optimizer: Box::new(ConstantRateOptimizer::new(0.01)),
+            optimizer: Box::new(AdamOptimizer::default()),
             layers,
         }
     }
@@ -77,6 +83,10 @@ impl<const I: usize, const O: usize> Network<I, O> {
         let softmaxed = softmax(&output_activs_non_normalized);
 
         softmaxed.data.into()
+    }
+
+    pub fn get_learning_rate(&self) -> f64 {
+        self.optimizer.get_learning_rate()
     }
 
     pub fn train(&mut self, samples: &Vec<(Vec<f64>, Vec<f64>)>) {
@@ -189,6 +199,8 @@ impl LayerGradients {
 
 /// Represents a layer in a network.
 struct Layer {
+    index: usize,
+
     /// The neurons forming the layer.
     neurons: Vec<Neuron>,
 
@@ -201,9 +213,25 @@ struct Layer {
     gradients: Option<LayerGradients>,
 }
 
+// Only valid to compare layers of the same network.
+impl PartialEq for Layer {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index
+    }
+}
+
+impl Eq for Layer {}
+
+impl Hash for Layer {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+    }
+}
+
 impl Layer {
-    fn new(neurons: Vec<Neuron>) -> Self {
+    fn new(index: usize, neurons: Vec<Neuron>) -> Self {
         Layer {
+            index,
             neurons,
             prev_activs: Default::default(),
             gradients: None,
@@ -453,11 +481,19 @@ trait Optimizer {
             n.params.bias += d_biases[ni];
         }
     }
+
+    fn get_learning_rate(&self) -> f64;
 }
 
 /// An optimizer that applies a constant unchanging learning rate to update params.
 struct ConstantRateOptimizer {
     learning_rate: f64,
+}
+
+impl Default for ConstantRateOptimizer {
+    fn default() -> Self {
+        Self::new(0.01)
+    }
 }
 
 impl ConstantRateOptimizer {
@@ -479,6 +515,114 @@ impl Optimizer for ConstantRateOptimizer {
     }
 
     fn exit(&mut self) {}
+
+    fn get_learning_rate(&self) -> f64 {
+        self.learning_rate
+    }
+}
+
+struct AdamOptimizer {
+    learning_rate: f64,
+    current_learning_rate: f64,
+    decay: f64,
+    beta1: f64,
+    beta2: f64,
+    iterations: u64,
+
+    layer_data: HashMap<usize, AdamOptimizerLayerData>,
+}
+
+struct AdamOptimizerLayerData {
+    weights_momentums: Matrix,
+    weights_cache: Matrix,
+    biases_momentums: Vector,
+    biases_cache: Vector,
+}
+
+impl AdamOptimizer {
+    fn new(learning_rate: f64, decay: f64, beta1: f64, beta2: f64) -> Self {
+        Self {
+            learning_rate,
+            current_learning_rate: learning_rate,
+            decay,
+            iterations: 0,
+            beta1,
+            beta2,
+
+            layer_data: Default::default(),
+        }
+    }
+}
+
+impl Default for AdamOptimizer {
+    fn default() -> Self {
+        Self::new(0.01, 0.0, 0.9, 0.999)
+    }
+}
+
+impl Optimizer for AdamOptimizer {
+    fn enter(&mut self) {
+        if self.decay != 0.0 {
+            self.current_learning_rate =
+                self.learning_rate * (1.0 / 1.0 + self.decay * self.iterations as f64);
+        }
+    }
+
+    fn update(&mut self, layer: &mut Layer) {
+        let g = layer.gradients.as_mut().unwrap();
+
+        if !self.layer_data.contains_key(&layer.index) {
+            let g_w = &g.weights;
+            let g_b = &g.biases;
+            self.layer_data.insert(
+                layer.index,
+                AdamOptimizerLayerData {
+                    weights_momentums: Matrix::zeros(g_w.nrows(), g_w.ncols()),
+                    weights_cache: Matrix::zeros(g_w.nrows(), g_w.ncols()),
+                    biases_momentums: Vector::zeros(g_b.nrows()),
+                    biases_cache: Vector::zeros(g_b.nrows()),
+                },
+            );
+        }
+
+        let data = self.layer_data.get_mut(&layer.index);
+        let data = data.unwrap();
+
+        data.weights_momentums =
+            self.beta1 * &data.weights_momentums + (1.0 - self.beta1) * &g.weights;
+        data.biases_momentums =
+            self.beta1 * &data.biases_momentums + (1.0 - self.beta1) * &g.biases;
+
+        let weights_momentums_corrected =
+            &data.weights_momentums / (1.0 - self.beta1.powf(self.iterations as f64 + 1.0));
+        let biases_momentums_corrected =
+            &data.biases_momentums / (1.0 - self.beta1.powf(self.iterations as f64 + 1.0));
+
+        data.weights_cache =
+            self.beta2 * &data.weights_cache + (1.0 - self.beta2) * g.weights.pow2(2);
+        data.biases_cache = self.beta2 * &data.biases_cache + (1.0 - self.beta2) * g.biases.pow2(2);
+
+        let weights_cache_corrected =
+            &data.weights_cache / (1.0 - self.beta2.powf(self.iterations as f64 + 1.0));
+        let biases_cache_corrected =
+            &data.biases_cache / (1.0 - self.beta2.powf(self.iterations as f64 + 1.0));
+
+        let u_weights = -self.current_learning_rate
+            * &weights_momentums_corrected
+                .div2(&weights_cache_corrected.sqrt().add_scalar(EPSILON));
+        let u_biases = -self.current_learning_rate
+            * &biases_momentums_corrected.div2(&biases_cache_corrected.sqrt().add_scalar(EPSILON));
+
+        self.update_for_descent(layer, u_weights, u_biases);
+    }
+
+    fn exit(&mut self) {
+        self.iterations += 1;
+    }
+
+    fn get_learning_rate(&self) -> f64 {
+        self.current_learning_rate
+    }
 }
 
 fn generate_random_neuron_params(count: usize) -> NeuronParams {

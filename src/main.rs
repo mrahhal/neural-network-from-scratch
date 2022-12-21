@@ -5,7 +5,7 @@ mod utils;
 use std::time::Instant;
 
 use crate::datasets::mnist::{Data, Image};
-use crate::neural_networks::basic::{self as nn, CCELoss, Loss};
+use crate::neural_networks::mlp::{self, CCELoss, Loss};
 use crate::utils::{argmax, shuffle_vec};
 
 fn main() {
@@ -14,7 +14,7 @@ fn main() {
         mut test,
     } = datasets::mnist::load_and_parse_data();
 
-    let mut network = nn::Network::<{ 28 * 28 }, 10>::new();
+    let mut network = mlp::Network::<{ 28 * 28 }, 10>::new();
 
     shuffle_vec(&mut train);
     let train: Vec<Image> = train.drain(..5_000).collect();
@@ -76,7 +76,7 @@ fn main() {
 }
 
 fn test_on<const I: usize, const O: usize>(
-    network: &nn::Network<I, O>,
+    network: &mlp::Network<I, O>,
     samples: &[Image],
     prev_values: &Option<(f64, f64)>,
 ) -> (f64, f64) {

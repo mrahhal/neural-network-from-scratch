@@ -1,3 +1,5 @@
+//! MLP (multi-layer perceptron) neural network implementation.
+
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
@@ -9,7 +11,7 @@ use nalgebra::{Dynamic, MatrixSlice, U1};
 
 use crate::utils::{rnd_normal, softmax, Arith, Matrix, Vector};
 
-/// A basic deep neural network.
+/// A MLP deep neural network.
 ///
 /// I: The number of neurons in the input layer.
 /// O: The number of neurons in the output layer.

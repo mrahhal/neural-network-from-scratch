@@ -16,50 +16,19 @@ fn main() {
 
     let mut network = nn::Network::<{ 28 * 28 }, 10>::new();
 
-    // let sample = &train[0];
-
-    // let input = sample.to_vec();
-    // let output = network.run(&input);
-
-    // let distribution_sum: f64 = output.iter().sum();
-    // // Make sure things look good.
-    // debug_assert!(distribution_sum > 0.99f64 && distribution_sum < 1.01f64);
-
-    // println!(
-    //     "{}, sum {}",
-    //     Vector::from_vec(output.clone()),
-    //     distribution_sum
-    // );
-
-    // let expected = sample.to_label_distribution();
-    // let loss = CCELoss::sample_loss(&expected, &output);
-
-    // println!(
-    //     "expected: {}, predicted: {}, loss: {}",
-    //     Vector::from_vec(expected.clone()),
-    //     Vector::from_vec(output.clone()),
-    //     loss,
-    // );
-
     shuffle_vec(&mut train);
-    // let validate: Vec<Image> = train.drain(50_000..).collect();
     let train: Vec<Image> = train.drain(..5_000).collect();
     let test: Vec<Image> = test.drain(..1_000).collect();
 
     println!("BEFORE TRAINING");
 
-    // Before training
-    // ---
-
     let mut prev_values: Option<(f64, f64)> = None;
     prev_values = Some(test_on(&network, &test, &prev_values));
 
-    // Training
-    // ---
+    println!("===");
 
     let target_accuracy = 0.95;
 
-    println!("===");
     println!(
         "Training and validating accuracy after each epoch. Target accuracy is {}%.",
         target_accuracy * 100f64,
@@ -74,7 +43,11 @@ fn main() {
         .collect();
     loop {
         println!("-------------------");
-        print!("Epoch #{}: training on {} samples...", epochs, dataset.len(),);
+        print!(
+            "Epoch #{}: training on {} samples...",
+            epochs,
+            dataset.len(),
+        );
         let instant = Instant::now();
 
         for chunk in train.chunks(100) {

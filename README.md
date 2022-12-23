@@ -5,9 +5,13 @@
 
 Neural network implementations from scratch in Rust.
 
-## Setup
+## Setup & Run
 
 Dataset used is [mnist](http://yann.lecun.com/exdb/mnist/). Download the 4 archives and extract them into "datasets/mnist" folder.
+
+A `cargo run` will setup the network, train it on a subset of the data while testing the result after each epoch infinitely until the target accuracy is reached. Currently, params resulting after training is not cached. Also, for now random seeds are used to produce reproducable and consistent results.
+
+This is running on the CPU right now, so it's not very fast. Ideally would want to make use of GPU computation.
 
 ## Current implementations
 

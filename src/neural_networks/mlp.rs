@@ -1,4 +1,12 @@
 //! MLP (multi-layer perceptron) neural network implementation.
+//!
+//! Legend:
+//! ```plain
+//! a: Activation value of a neuron.
+//! z: Value of a neuron before activation (summation).
+//! L: Loss of the network.
+//! g_x: Gradient of x (∂L/∂x).
+//! ```
 
 use std::{
     cell::{Cell, RefCell},
@@ -11,7 +19,7 @@ use nalgebra::{Dynamic, MatrixSlice, U1};
 
 use crate::utils::{rnd_normal, softmax, Arith, Matrix, Vector};
 
-/// A MLP deep neural network.
+/// An MLP deep neural network.
 ///
 /// I: The number of neurons in the input layer.
 /// O: The number of neurons in the output layer.
@@ -319,17 +327,17 @@ impl Neuron {
     ) -> Vector {
         let z = self.z.get();
 
-        // da/dz
+        // ∂a/∂z
         let d_a_z = self.activator.derivative(z);
 
-        // dL/dz
-        // next_values are `g_z.W` from the next layer.
+        // ∂L/∂z
+        // next_values are `g_z.W` from the next layer, or in the case of the output layer, it'll be the softmax+loss deriv.
         let g_z = d_a_z * next_values.sum();
 
-        // dL/dw
+        // ∂L/∂w
         let g_w = prev_activs * g_z;
 
-        // dL/db
+        // ∂L/∂b
         let g_b = g_z;
 
         self.gradient.replace(NeuronGradient {

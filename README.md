@@ -21,4 +21,5 @@ Upcoming implementations:
 - Transformer
 
 Improvements:
+- Split lib crates
 - GPU

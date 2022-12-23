@@ -12,7 +12,6 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     f64::EPSILON,
-    hash::Hash,
 };
 
 use nalgebra::{Dynamic, MatrixSlice, U1};
@@ -214,28 +213,11 @@ struct Layer {
     /// The neurons forming the layer.
     neurons: Vec<Neuron>,
 
-    // /// The activator used in the layer.
-    // activator: Box<dyn Activator>,
     /// The current run's activations of the preceding layer.
     /// Used when backpropagating.
     prev_activs: RefCell<Option<Vector>>,
 
     gradients: Option<LayerGradients>,
-}
-
-// Only valid to compare layers of the same network.
-impl PartialEq for Layer {
-    fn eq(&self, other: &Self) -> bool {
-        self.index == other.index
-    }
-}
-
-impl Eq for Layer {}
-
-impl Hash for Layer {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.index.hash(state);
-    }
 }
 
 impl Layer {

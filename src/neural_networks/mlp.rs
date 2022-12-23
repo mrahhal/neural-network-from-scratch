@@ -513,6 +513,9 @@ impl Optimizer for ConstantRateOptimizer {
     }
 }
 
+/// The [Adam] optimizer.
+///
+/// [Adam]: https://en.wikipedia.org/wiki/Stochastic_gradient_descent#Adam
 struct AdamOptimizer {
     learning_rate: f64,
     current_learning_rate: f64,

@@ -70,8 +70,11 @@ impl<const I: usize, const O: usize> Network<I, O> {
             || Box::new(NoopActivator),
         ));
 
+        let mut adam = AdamOptimizer::default();
+        adam.decay = 1e-4;
+
         Self {
-            optimizer: Box::new(AdamOptimizer::default()),
+            optimizer: Box::new(adam),
             layers,
         }
     }
@@ -550,7 +553,7 @@ impl AdamOptimizer {
 
 impl Default for AdamOptimizer {
     fn default() -> Self {
-        Self::new(0.01, 0.0, 0.9, 0.999)
+        Self::new(0.001, 0.0, 0.9, 0.999)
     }
 }
 
@@ -558,7 +561,7 @@ impl Optimizer for AdamOptimizer {
     fn enter(&mut self) {
         if self.decay != 0.0 {
             self.current_learning_rate =
-                self.learning_rate * (1.0 / 1.0 + self.decay * self.iterations as f64);
+                self.learning_rate * (1.0 / (1.0 + self.decay * self.iterations as f64));
         }
     }
 

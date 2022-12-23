@@ -27,7 +27,7 @@ fn main() {
 
     println!("===");
 
-    let target_accuracy = 0.9;
+    let target_accuracy = 0.95;
 
     println!(
         "Training and validating accuracy after each epoch. Target accuracy is {}%.",

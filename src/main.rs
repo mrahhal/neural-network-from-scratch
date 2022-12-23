@@ -14,7 +14,7 @@ fn main() {
         mut test,
     } = datasets::mnist::load_and_parse_data();
 
-    let mut network = mlp::Network::<{ 28 * 28 }, 10>::new();
+    let mut network = mlp::Network::<{ 28 * 28 }, 10>::new(&[200, 80]);
 
     shuffle_vec(&mut train);
     let train: Vec<Image> = train.drain(..5_000).collect();

@@ -49,8 +49,7 @@ fn create_layer(
 }
 
 impl<const I: usize, const O: usize> Network<I, O> {
-    pub fn new() -> Self {
-        let hidden_layers = [200, 80];
+    pub fn new(hidden_layers: &[usize]) -> Self {
         let hidden_layers_count = hidden_layers.len();
 
         // + 1 output layer

@@ -21,5 +21,6 @@ Upcoming implementations:
 - Transformer
 
 Improvements:
+- Serialize/Deserialize params
 - Split lib crates
 - GPU

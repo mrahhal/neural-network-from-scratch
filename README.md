@@ -49,6 +49,7 @@ Upcoming implementations:
 
 ## Improvements
 
-- Serialize/Deserialize params
+- More configuration (choose activation, additional layers such as dropout, etc)
+- Serialize/Deserialize params to save training result
 - Split lib crates
 - GPU

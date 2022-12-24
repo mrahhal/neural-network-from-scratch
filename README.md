@@ -17,6 +17,27 @@ This is running on the CPU right now, so it's not very fast. Ideally would want 
 
 - [MLP](./src/neural_networks/mlp.rs): A multi-layer perceptron neural network.
 
+## Usage
+
+Following are simple usages for the current implementations to play with.
+
+MLP:
+```rust
+let train_dataset = ...;
+let test_dataset = ...;
+
+// Create
+let mut network = mlp::Network</* input neurons */ 100, /* output neurons */ 10>::new(/* hidden layers */ &[60, 40]);
+
+// Train
+network.train(&train_dataset);
+
+// Test
+for sample in test_dataset {
+    let result = network.run(&sample);
+}
+```
+
 ## Ideas
 
 Upcoming implementations:
@@ -24,7 +45,8 @@ Upcoming implementations:
 - RNN (LSTM)
 - Transformer
 
-Improvements:
+## Improvements
+
 - Serialize/Deserialize params
 - Split lib crates
 - GPU
